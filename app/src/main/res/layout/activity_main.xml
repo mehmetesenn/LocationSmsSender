@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Ülke Kodu Spinner'ı -->
+    <Spinner
+        android:id="@+id/spinnerCountryCode"
+        android:layout_width="381dp"
+        android:layout_height="54dp" />
+
+    <!-- Telefon Numarası EditText'i -->
+    <EditText
+        android:id="@+id/etPhoneNumber"
+        android:layout_width="384dp"
+        android:layout_height="67dp"
+        android:hint="Telefon Numarası"
+        android:inputType="phone" />
+
+    <!-- SMS Gönderme Butonu -->
+    <Button
+        android:id="@+id/btnSendSMS"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SMS Gönder" />
+</LinearLayout>
