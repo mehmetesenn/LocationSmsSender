@@ -29,5 +29,5 @@
    cd LocationSmsSender
    
 ---
-## 📲 Uygulamyı İndir
+## 📲 Uygulamayı İndir
 https://github.com/mehmetesenn/LocationSmsSender/blob/master/app-debug.aab
