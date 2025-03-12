@@ -30,4 +30,4 @@
    
 ---
 ## 📲 Uygulamayı İndir
-https://github.com/mehmetesenn/LocationSmsSender/blob/master/app-debug.aab
+https://github.com/mehmetesenn/LocationSmsSender/blob/master/app-debug.apk
