@@ -27,3 +27,4 @@
    ```bash
    git clone https://github.com/mehmetesenn/LocationSmsSender.git
    cd LocationSmsSender
+   Uygulamayı buradan indirebilirsiniz: https://github.com/mehmetesenn/LocationSmsSender/blob/master/app-debug.aab
