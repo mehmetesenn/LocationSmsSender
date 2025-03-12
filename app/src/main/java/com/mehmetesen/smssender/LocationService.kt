@@ -12,21 +12,22 @@ import android.os.IBinder
 import android.os.Looper
 import android.telephony.SmsManager
 import android.util.Log
-import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.*
+import java.util.concurrent.atomic.AtomicBoolean
 
 class LocationService : Service() {
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private lateinit var locationRequest: LocationRequest  // locationRequest tanımlandı
-    private val handler = Handler(Looper.getMainLooper())
+    private lateinit var locationRequest: LocationRequest
     private lateinit var phoneNumber: String
-
+    private val handler = Handler(Looper.getMainLooper())
+    private val isSending = AtomicBoolean(false) // SMS gönderimi kontrolü için atomik flag
+    private var locationRunnable: Runnable? = null
+    private var locationCallback: LocationCallback? = null // Konum callback'i
 
     override fun onCreate() {
-
         super.onCreate()
         startForeground(1, createNotification())
 
@@ -39,18 +40,13 @@ class LocationService : Service() {
             priority = LocationRequest.PRIORITY_HIGH_ACCURACY
         }
 
-        // Her 5 dakikada bir konumu al ve SMS gönder
-        handler.postDelayed(object : Runnable {
-            override fun run() {
-                getLocationAndSendSMS()
-                handler.postDelayed(this, 5 * 60 * 1000) // 5 dakika (300.000 ms)
-            }
-        }, 0)
+        // Başlangıçta hemen çalıştır
+        startLocationTask()
     }
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        phoneNumber = intent?.getStringExtra("PHONE_NUMBER")!!
-        Log.d("LocationService", "Alınan Telefon Numarası: $phoneNumber")
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        phoneNumber = intent?.getStringExtra("PHONE_NUMBER") ?: ""
+        Log.d("LocationService", "Alınan Telefon Numarası: $phoneNumber")
         return START_STICKY
     }
 
@@ -70,25 +66,58 @@ class LocationService : Service() {
             .build()
     }
 
+    // Konum alma ve SMS gönderme işlemi
+    private fun startLocationTask() {
+        // Zamanlayıcı, her 5 dakikada bir çalışacak şekilde ayarlandı
+        locationRunnable = object : Runnable {
+            override fun run() {
+                // SMS gönderimi yapılmıyorsa, yeni bir SMS gönder
+                if (!isSending.get()) {
+                    getLocationAndSendSMS()
+                }
+                // SMS gönderimi bitene kadar yeni SMS gönderimi başlatılmasın
+                handler.postDelayed(this, 5 * 60 * 1000) // Her 5 dakikada bir tekrar et
+            }
+        }
+
+        // İlk başta hemen başlatıyoruz
+        locationRunnable?.let {
+            handler.post(it)
+        }
+    }
+
     private fun getLocationAndSendSMS() {
+        // Konum izni kontrolü
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             Log.e("LocationService", "Konum izni yok!")
             return
         }
 
-        // Güncel konum almak için requestLocationUpdates kullanıyoruz
-        fusedLocationClient.requestLocationUpdates(locationRequest, object : LocationCallback() {
-            override fun onLocationResult(locationResult: LocationResult) {
-                locationResult?.let {
-                    val location = it.lastLocation
-                    location?.let { loc ->
-                        val latitude = loc.latitude
-                        val longitude = loc.longitude
-                        sendSMS(phoneNumber, "Konum: https://www.google.com/maps?q=$latitude,$longitude")
+        // Konum verisini al
+        if (isSending.compareAndSet(false, true)) {  // Eğer daha önce SMS gönderilmiyorsa
+            // Eğer daha önce locationCallback başlatılmadıysa, başlatıyoruz
+            if (locationCallback == null) {
+                locationCallback = object : LocationCallback() {
+                    override fun onLocationResult(locationResult: LocationResult) {
+                        locationResult?.let {
+                            val location = it.lastLocation
+                            location?.let { loc ->
+                                val latitude = loc.latitude
+                                val longitude = loc.longitude
+                                sendSMS(phoneNumber, "Konum: https://www.google.com/maps?q=$latitude,$longitude")
+                                // Konum güncellemelerini durdur
+                                fusedLocationClient.removeLocationUpdates(locationCallback!!)
+                                locationCallback = null // Callback'i sıfırla
+                            }
+                        }
+                        // SMS gönderimi tamamlandığında flag'i tekrar false yap
+                        isSending.set(false)
                     }
                 }
+                // Konum güncellemelerini başlatıyoruz
+                fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback!!, Looper.getMainLooper())
             }
-        }, Looper.getMainLooper())
+        }
     }
 
     private fun sendSMS(phoneNumber: String, message: String) {
@@ -108,6 +137,13 @@ class LocationService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacksAndMessages(null)
+        // Zamanlayıcıyı iptal et
+        locationRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+        // Konum güncellemelerini durdur
+        locationCallback?.let {
+            fusedLocationClient.removeLocationUpdates(it)
+        }
     }
 }
